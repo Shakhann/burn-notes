@@ -124,6 +124,14 @@ function switchTab(name) {
 $('#tab-create').addEventListener('click', () => switchTab('create'));
 $('#tab-read').addEventListener('click', () => switchTab('read'));
 
+/* Hero-дағы батырмалар: жұмыс бөлігіне тартып, тиісті табты ашады */
+function goToApp(tab) {
+  switchTab(tab);
+  document.getElementById('app-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('#cta-create').addEventListener('click', () => goToApp('create'));
+$('#cta-read').addEventListener('click', () => goToApp('read'));
+
 /* ============================================================
  * ТАБ 1: ЖАЗБА ЖАСАУ
  * ============================================================ */
@@ -602,6 +610,8 @@ $('#btn-download-text').addEventListener('click', () => {
 /* ---------- Роутер: сілтеме ашылса — «Жазба оқу» табын ашып,
    құпия сөзсіз жазбаны АВТОМАТТЫ оқиды (сілтеме = кіру) ---------- */
 (function route() {
+  // Сілтеме ашылса (алымышы үшін) — тақырыпты жасырып, тікелей оқуға өтеміз
+  if (noteMatch) document.getElementById('hero').classList.add('hidden');
   if (noteMatch && frag.k) {
     switchTab('read');
     showNoteUi();
