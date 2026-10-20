@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="kk">
+<html lang="kk" class="fonts-pending">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,14 +7,17 @@
   <meta name="description" content="Мәтін, сурет, аудио, видео — браузерде AES-256-GCM шифрланады, ашылған сәтте толығымен күйеді." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <style>
+    /* Шрифт толық жүктелгенше hero жасырылады — әріптер аралас көрінбесін */
+    html.fonts-pending #hero { opacity: 0; }
+    #hero { transition: opacity .5s ease; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; }
-    .font-display { font-family: 'Unbounded', 'Space Grotesk', sans-serif; }
+    body { font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; }
+    .font-display { font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.01em; }
 
     /* ---------- анімдалған "аура" фон ---------- */
     .aurora { position: fixed; inset: 0; z-index: -2; overflow: hidden; background: #06060b; }

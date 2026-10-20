@@ -32,6 +32,24 @@ if (!window.isSecureContext || !crypto?.subtle) {
   document.body.prepend(w);
 }
 
+/* ---------- Шрифт: қазақ әріптерінің (cyrillic-ext) subset-ін
+   алдын ала жүктеу — тақырып аралас шрифтпен көрінбесін ---------- */
+const KAZ_FONT_CHARS = 'БАРДЖЗЙКЛМНӨПСТУХҲФЦЧШЫЭЮЯәғқңөұүһіБІРТЕТКЖАЗС0123456789';
+(async () => {
+  try {
+    await Promise.all([
+      document.fonts.load('400 1em "Montserrat"', KAZ_FONT_CHARS),
+      document.fonts.load('600 1em "Montserrat"', KAZ_FONT_CHARS),
+      document.fonts.load('700 1em "Montserrat"', KAZ_FONT_CHARS),
+      document.fonts.load('800 1em "Montserrat"', KAZ_FONT_CHARS),
+      document.fonts.load('900 1em "Montserrat"', KAZ_FONT_CHARS),
+    ]);
+  } catch { /* шрифт жүктелмесе де бет ашылады */ }
+  document.documentElement.classList.remove('fonts-pending');
+})();
+// Қорғау: бәрібір 4 сектен кейін бет ашылады
+setTimeout(() => document.documentElement.classList.remove('fonts-pending'), 4000);
+
 /* ---------- base64url ---------- */
 function toB64u(bytes) {
   const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
