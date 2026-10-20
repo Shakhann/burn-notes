@@ -23,7 +23,9 @@ const store = new NoteStore({ sweepMs: 30_000 });
 
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json({ limit: '512kb' }));
+// Жазба ішінде файлдар (сурет/аудио/видео) болғандықтан — payload үлкен болады.
+// Шек: 40 МБ JSON (шамамен 30 МБ шифрланған дерек + base64 ұлғаюы).
+app.use(express.json({ limit: '40mb' }));
 
 // Қауіпсіздік тілбастары:
 //  Referrer-Policy: no-referrer — кілтті Referrer арқылы ұрлаудан қорғау
@@ -43,7 +45,8 @@ const MAX_TTL = 7 * 24 * 3600;
 /** Жазба жасау: тек ciphertext сақталады. */
 app.post('/api/notes', (req, res) => {
   const { data, ttl } = req.body ?? {};
-  if (typeof data !== 'string' || data.length < 16 || data.length > 500_000) {
+  // data = base64url(IV || ciphertext): мәтін+файлдар конвертінің шифрланған түрі
+  if (typeof data !== 'string' || data.length < 16 || data.length > 40_000_000) {
     return res.status(400).json({ error: 'invalid_data' });
   }
   const t = Number(ttl);

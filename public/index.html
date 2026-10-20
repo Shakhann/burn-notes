@@ -62,10 +62,27 @@
           <label class="block">
             <span class="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-300">
               <i data-lucide="pen-line" class="h-4 w-4 text-emerald-400"></i>Кұпия хабарлама
+              <span class="text-slate-500">(ерікті — файл қоссаңыз мәтінсіз де болады)</span>
             </span>
-            <textarea id="note-text" rows="6" placeholder="Мәтінді мұнда жазыңыз…"
+            <textarea id="note-text" rows="5" placeholder="Мәтінді мұнда жазыңыз (ерікті)…"
               class="w-full resize-y rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"></textarea>
           </label>
+
+          <!-- файлдар: сурет / аудио / видео / кез келген файл -->
+          <div class="block">
+            <span class="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-300">
+              <i data-lucide="paperclip" class="h-4 w-4 text-cyan-400"></i>Файлдар
+              <span class="text-slate-500">(ерікті)</span>
+            </span>
+            <input id="note-files" type="file" multiple class="hidden" />
+            <button type="button" id="btn-add-files"
+              class="flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/20 bg-black/20 px-4 py-5 text-sm text-slate-400 transition hover:border-cyan-400/50 hover:text-slate-200">
+              <i data-lucide="upload-cloud" class="h-6 w-6 text-cyan-400/80"></i>
+              Сурет, аудио, видео немесе файл таңдау
+              <span class="text-xs text-slate-500">Ең көбі 5 файл, әрқайсысы 10 МБ-дан аспауы тиіс</span>
+            </button>
+            <ul id="file-list" class="mt-2 space-y-1.5"></ul>
+          </div>
 
           <label class="block">
             <span class="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-300">
@@ -122,7 +139,7 @@
 
           <p class="flex items-start gap-2 text-xs leading-relaxed text-slate-500">
             <i data-lucide="lock" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400/70"></i>
-            <span>Мәтін браузеріңізде AES-256-GCM алгоритмімен шифрланады. Серверде тек шифрланған деректер
+            <span>Мәтін мен файлдар браузеріңізде AES-256-GCM алгоритмімен шифрланады. Серверде тек шифрланған деректер
             сақталады; кілт URL-дің <code class="font-mono">#</code> бөлігінде болады және серверге ешқашан жіберілмейді.</span>
           </p>
         </div>
@@ -147,6 +164,8 @@
               <i data-lucide="copy" class="h-4 w-4"></i>Көшіру
             </button>
           </div>
+
+          <p id="created-files-note" class="hidden text-xs text-slate-400"></p>
 
           <div class="flex items-start gap-2.5 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3.5 text-xs leading-relaxed text-amber-200">
             <i data-lucide="triangle-alert" class="mt-0.5 h-4 w-4 shrink-0"></i>
@@ -222,8 +241,11 @@
             <i data-lucide="flame" class="h-5 w-5 shrink-0"></i>
             <span>Жазба оқылды және <b>толығымен жойылды</b>. Бұл сілтеме одан әрі жұмыс істемейді.</span>
           </div>
-          <div id="revealed-text"
-            class="whitespace-pre-wrap break-words rounded-xl border border-white/10 bg-black/30 p-4 text-sm leading-relaxed text-slate-100"></div>
+          <div id="revealed-text-wrap">
+            <div id="revealed-text"
+              class="whitespace-pre-wrap break-words rounded-xl border border-white/10 bg-black/30 p-4 text-sm leading-relaxed text-slate-100"></div>
+          </div>
+          <div id="revealed-files" class="space-y-3"></div>
           <button id="btn-again"
             class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-200 transition hover:bg-white/10">
             Жаңа сілтеме оқу

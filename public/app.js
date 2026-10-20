@@ -156,17 +156,80 @@ document.querySelectorAll('.ttl-chip').forEach((btn) =>
   })
 );
 
+/* ---------- Файлдар: сурет / аудио / видео / кез келген файл ---------- */
+const MAX_FILES = 5;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 МБ
+let pendingFiles = []; // { name, type, size, buf: Uint8Array }
+const fmtSize = (b) =>
+  b >= 1048576 ? (b / 1048576).toFixed(1) + ' МБ'
+  : b >= 1024 ? Math.round(b / 1024) + ' КБ'
+  : b + ' Б';
+
+function renderFileList() {
+  const ul = $('#file-list');
+  ul.innerHTML = '';
+  pendingFiles.forEach((f, i) => {
+    const li = document.createElement('li');
+    li.className = 'flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs';
+    const icon = document.createElement('i');
+    icon.setAttribute('data-lucide',
+      f.type.startsWith('image/') ? 'image'
+      : f.type.startsWith('audio/') ? 'music'
+      : f.type.startsWith('video/') ? 'video'
+      : 'file');
+    icon.className = 'h-4 w-4 shrink-0 text-cyan-400';
+    const name = document.createElement('span');
+    name.className = 'min-w-0 flex-1 truncate text-slate-200';
+    name.textContent = f.name; // textContent — қауіпсіз
+    const size = document.createElement('span');
+    size.className = 'shrink-0 text-slate-500';
+    size.textContent = fmtSize(f.size);
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'shrink-0 text-slate-500 transition hover:text-rose-400';
+    rm.title = 'Алып тастау';
+    rm.innerHTML = '<i data-lucide="x" class="h-4 w-4"></i>';
+    rm.addEventListener('click', () => { pendingFiles.splice(i, 1); renderFileList(); });
+    li.append(icon, name, size, rm);
+    ul.appendChild(li);
+  });
+  if (ul.children.length) lucide.createIcons();
+}
+
+$('#btn-add-files').addEventListener('click', () => $('#note-files').click());
+$('#note-files').addEventListener('change', async (e) => {
+  for (const f of e.target.files) {
+    if (pendingFiles.length >= MAX_FILES) { alert('Ең көбі ' + MAX_FILES + ' файл қосуға болады.'); break; }
+    if (f.size > MAX_FILE_SIZE) { alert('«' + f.name + '» 10 МБ-дан үлкен — қосылмады.'); continue; }
+    pendingFiles.push({
+      name: f.name,
+      type: f.type || 'application/octet-stream',
+      size: f.size,
+      buf: new Uint8Array(await f.arrayBuffer()),
+    });
+  }
+  e.target.value = '';
+  renderFileList();
+});
+
 $('#btn-create').addEventListener('click', async () => {
-  const text = $('#note-text').value;
+  const text = $('#note-text').value.trim();
   const ttl = readTtl();
   const password = $('#note-pw').value;
   const btn = $('#btn-create');
-  if (!text.trim()) return alert('Алдымен хабарлама мәтінін жазыңыз.');
+  if (!text && !pendingFiles.length) return alert('Мәтін жазыңыз немесе кем дегенде бір файл таңдаңыз.');
   if (ttl > TTL_MAX) return alert('Максимум сақтау мерзімі — 7 күн.');
   btn.disabled = true;
   try {
     const key = await makeAesKey();
-    const payload = await aesEncrypt(key, te.encode(text)); // серверге тек бұл кетеді
+    // Ашық «конверт»: мәтін + файлдар (base64). Бүкіл конверт
+    // бір AES-256-GCM кілтімен шифрланады — серверге тек ciphertext кетеді.
+    const envelope = JSON.stringify({
+      v: 1,
+      t: text || null,
+      f: pendingFiles.map((f) => ({ n: f.name, m: f.type, d: toB64u(f.buf) })),
+    });
+    const payload = await aesEncrypt(key, te.encode(envelope)); // серверге тек бұл кетеді
     const frag = password
       ? await wrapKeyWithPassword(key, password)
       : { k: toB64u(new Uint8Array(await crypto.subtle.exportKey('raw', key))) };
@@ -181,6 +244,14 @@ $('#btn-create').addEventListener('click', async () => {
 
     $('#link-box').textContent =
       location.origin + '/note/' + id + '#' + new URLSearchParams(frag).toString();
+    const fnote = $('#created-files-note');
+    if (pendingFiles.length) {
+      fnote.textContent = 'Қосылған файлдар: ' + pendingFiles.map((f) => f.name).join(', ') +
+        ' (' + fmtSize(pendingFiles.reduce((s, f) => s + f.size, 0)) + ') — бәрі бір шифрмен қорғалған.';
+      fnote.classList.remove('hidden');
+    } else {
+      fnote.classList.add('hidden');
+    }
     $('#create-form').classList.add('hidden');
     $('#create-result').classList.remove('hidden');
   } catch (e) {
@@ -211,6 +282,9 @@ $('#btn-copy').addEventListener('click', async () => {
 $('#btn-new').addEventListener('click', () => {
   $('#note-text').value = '';
   $('#note-pw').value = '';
+  pendingFiles = [];
+  renderFileList();
+  $('#created-files-note').classList.add('hidden');
   $('#create-result').classList.add('hidden');
   $('#create-form').classList.remove('hidden');
 });
@@ -284,6 +358,64 @@ const readErrorShow = (msg) => {
 };
 const readErrorHide = () => readErrorEl.classList.add('hidden');
 
+/* ---------- Ашылған жазбаны көрсету: мәтін + файлдар ---------- */
+let revealedObjectUrls = [];
+function revokeRevealedUrls() {
+  revealedObjectUrls.forEach((u) => URL.revokeObjectURL(u));
+  revealedObjectUrls = [];
+}
+function showRevealedContent(plain) {
+  const textWrap = $('#revealed-text-wrap');
+  const textEl = $('#revealed-text');
+  const filesEl = $('#revealed-files');
+  filesEl.innerHTML = '';
+  revokeRevealedUrls();
+
+  // Ашық мәтін — JSON-конверт (жаңа жазбалар) немесе жай мәтін (ескі)
+  let env = null;
+  try {
+    const j = JSON.parse(plain);
+    if (j && typeof j === 'object' && j.v === 1) env = j;
+  } catch { /* жай мәтін */ }
+
+  const text = env ? (env.t || '') : plain;
+  if (text) {
+    textWrap.classList.remove('hidden');
+    textEl.textContent = text;
+  } else {
+    textWrap.classList.add('hidden');
+  }
+
+  for (const f of (env && Array.isArray(env.f) ? env.f : [])) {
+    const bytes = fromB64u(f.d);
+    const url = URL.createObjectURL(new Blob([bytes], { type: f.m || 'application/octet-stream' }));
+    revealedObjectUrls.push(url);
+
+    const mime = f.m || '';
+    const isImg = mime.startsWith('image/');
+    const isAudio = mime.startsWith('audio/');
+    const isVideo = mime.startsWith('video/');
+    let mediaHtml = '';
+    if (isImg) mediaHtml = '<img src="' + url + '" alt="" class="max-h-96 w-full bg-black/40 object-contain" />';
+    else if (isAudio) mediaHtml = '<audio controls src="' + url + '" class="w-full"></audio>';
+    else if (isVideo) mediaHtml = '<video controls src="' + url + '" class="max-h-96 w-full bg-black/40"></video>';
+
+    const card = document.createElement('div');
+    card.className = 'overflow-hidden rounded-xl border border-white/10 bg-black/30';
+    card.innerHTML =
+      (mediaHtml ? mediaHtml + '<div class="flex items-center gap-2 border-t border-white/10 p-3">' : '<div class="flex items-center gap-2 p-3">') +
+      '<i data-lucide="' + (isImg ? 'image' : isAudio ? 'music' : isVideo ? 'video' : 'file') + '" class="h-4 w-4 shrink-0 text-cyan-400"></i>' +
+      '<span class="file-name min-w-0 flex-1 truncate text-xs text-slate-300"></span>' +
+      '<span class="shrink-0 text-xs text-slate-500">' + fmtSize(bytes.length) + '</span>' +
+      '<a href="' + url + '" download="" class="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 transition hover:bg-white/10">' +
+      '<i data-lucide="download" class="h-3.5 w-3.5"></i>Жүктеу</a></div>';
+    card.querySelector('.file-name').textContent = f.n; // файл атауы — мәтін ретінде (XSS-қауіпсіз)
+    card.querySelector('a[download]').setAttribute('download', f.n);
+    filesEl.appendChild(card);
+  }
+  if (filesEl.children.length) lucide.createIcons();
+}
+
 /* «Ашу» — бір функция: қолмен басу (құпия сөзбен) немесе сілтеме
    ашылғанда автоматты (құпия сөзсіз). Сілтемені ашу = кіру. */
 async function doReveal() {
@@ -307,9 +439,9 @@ async function doReveal() {
     if (resp.status === 404) return showGoneView(); // «Жазба табылмады немесе жойылған»
     if (!resp.ok) throw new Error('сервер қатесі: ' + resp.status);
     const { data } = await resp.json();
-    const text = await aesDecrypt(key, data);
+    const plain = await aesDecrypt(key, data);
     history.replaceState(null, '', location.pathname); // кілт енді қажет емес — URL-ден аластаймыз
-    $('#revealed-text').textContent = text;
+    showRevealedContent(plain);
     $('#read-intro').classList.add('hidden');
     $('#note-ui').classList.add('hidden');
     $('#view-gone').classList.add('hidden');
