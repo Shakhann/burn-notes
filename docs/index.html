@@ -140,10 +140,6 @@
         <p class="font-display mt-3 text-sm font-medium text-slate-300 sm:text-base">
           Оқылған сәтте толығымен күйеді 🔥
         </p>
-        <p class="mx-auto mt-5 max-w-md text-sm leading-relaxed text-slate-400 sm:text-base">
-          Мәтін, сурет, аудио, видео — бәрі <b class="font-semibold text-slate-200">браузеріңізде</b>
-          AES-256-GCM-мен шифрланады. Кілт тек сілтемеде, серверде тек ciphertext.
-        </p>
         <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <button id="cta-create"
             class="btn-fire flex w-full items-center justify-center gap-2 rounded-2xl px-8 py-4 text-sm sm:w-auto">
@@ -446,11 +442,6 @@
     </footer>
   </div>
 
-  <script>
-    /* Базис жолы: Express /note/<id> бетінде '/' ; GitHub Pages-те /burn-notes/.
-       app.js relative жүктелуі екі де жерде дұрыс болуы үшін. */
-    document.write('<base href="' + (location.pathname.indexOf('/note/') === 0 ? '/' : location.pathname.replace(/[^/]+$/, '')) + '"/>');
-  </script>
   <script src="app.js"></script>
   <script>lucide.createIcons();</script>
 </body>
