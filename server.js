@@ -90,9 +90,9 @@ app.get('/api/notes/:id', (req, res) => {
 app.get('/api/health', (_req, res) => res.json({ ok: true, notes: store.size() }));
 
 // Статикалық файлдар + SPA маршрут ( /note/:id -> сол бір index.html )
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'docs')));
 app.get('/note/:id', (_req, res) =>
-  res.sendFile(path.join(__dirname, 'public', 'index.html'))
+  res.sendFile(path.join(__dirname, 'docs', 'index.html'))
 );
 
 // Қате өңдеуші: request body логқа түспейді
