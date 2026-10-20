@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="kk" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Бір реттік қорғалған жазбалар</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'] },
+          colors: { ink: '#070b12', panel: '#0d1420' },
+          keyframes: { fadeIn: { from: { opacity: 0, transform: 'translateY(6px)' }, to: { opacity: 1, transform: 'none' } } },
+          animation: { 'fade-in': 'fadeIn .4s ease both' },
+        },
+      },
+    };
+  </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      background:
+        radial-gradient(1200px 600px at 70% -10%, rgba(16, 185, 129, .08), transparent 60%),
+        radial-gradient(900px 500px at 10% 110%, rgba(34, 211, 238, .07), transparent 60%),
+        #070b12;
+    }
+    .glow { box-shadow: 0 0 0 1px rgba(16, 185, 129, .15), 0 20px 60px -20px rgba(16, 185, 129, .25); }
+  </style>
+</head>
+<body class="min-h-screen text-slate-200 antialiased">
+  <div class="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center px-4 py-10">
+
+    <header class="mb-8 text-center">
+      <div class="glow mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 text-emerald-300">
+        <i data-lucide="shield-check" class="h-7 w-7"></i>
+      </div>
+      <h1 class="text-2xl font-semibold tracking-tight text-white">Бір реттік қорғалған жазбалар</h1>
+      <p class="mt-1 text-sm text-slate-400">AES-256-GCM шифрлау · бірегей сілтеме · оқылған соң жойылады</p>
+    </header>
+
+    <main class="rounded-2xl border border-white/10 bg-panel/80 p-6 shadow-2xl backdrop-blur sm:p-8">
+
+      <!-- ============ ТАПТАР (tabs) ============ -->
+      <div role="tablist" class="mb-6 grid grid-cols-2 gap-1.5 rounded-xl border border-white/10 bg-black/30 p-1.5">
+        <button id="tab-create"
+          class="flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 px-2 py-2.5 text-xs font-semibold leading-tight text-slate-950 sm:gap-2 sm:px-3 sm:text-sm">
+          <i data-lucide="pen-line" class="h-4 w-4 shrink-0"></i>Жазба жасау
+        </button>
+        <button id="tab-read"
+          class="flex items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-xs font-medium leading-tight text-slate-400 transition hover:text-slate-200 sm:gap-2 sm:px-3 sm:text-sm">
+          <i data-lucide="eye" class="h-4 w-4 shrink-0"></i>Жазба оқу
+        </button>
+      </div>
+
+      <!-- ============ ТАБ 1: ЖАЗБА ЖАСАУ ============ -->
+      <section id="panel-create" class="hidden">
+
+        <!-- форма -->
+        <div id="create-form" class="hidden animate-fade-in space-y-5">
+          <label class="block">
+            <span class="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-300">
+              <i data-lucide="pen-line" class="h-4 w-4 text-emerald-400"></i>Кұпия хабарлама
+            </span>
+            <textarea id="note-text" rows="6" placeholder="Мәтінді мұнда жазыңыз…"
+              class="w-full resize-y rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-400/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/20"></textarea>
+          </label>
+
+          <label class="block">
+            <span class="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-300">
+              <i data-lucide="timer" class="h-4 w-4 text-cyan-400"></i>Сақтау уақыты
+              <span class="text-slate-500">(өзіңіз таңдай аласыз)</span>
+            </span>
+            <div class="grid grid-cols-3 gap-2">
+              <div class="relative">
+                <input id="ttl-h" type="number" min="0" max="168" value="0"
+                  class="w-full rounded-xl border border-white/10 bg-black/30 p-2.5 pr-11 text-sm focus:border-cyan-400/60 focus:outline-none" />
+                <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">сағ</span>
+              </div>
+              <div class="relative">
+                <input id="ttl-m" type="number" min="0" max="59" value="0"
+                  class="w-full rounded-xl border border-white/10 bg-black/30 p-2.5 pr-11 text-sm focus:border-cyan-400/60 focus:outline-none" />
+                <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">мин</span>
+              </div>
+              <div class="relative">
+                <input id="ttl-s" type="number" min="0" max="59" value="0"
+                  class="w-full rounded-xl border border-white/10 bg-black/30 p-2.5 pr-11 text-sm focus:border-cyan-400/60 focus:outline-none" />
+                <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">сек</span>
+              </div>
+            </div>
+            <div id="ttl-presets" class="mt-2 flex flex-wrap gap-1.5">
+              <button type="button" data-h="0" data-m="1" data-s="0"
+                class="ttl-chip rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-white/10">1 мин</button>
+              <button type="button" data-h="0" data-m="5" data-s="0"
+                class="ttl-chip rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-white/10">5 мин</button>
+              <button type="button" data-h="1" data-m="0" data-s="0"
+                class="ttl-chip rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-white/10">1 сағ</button>
+              <button type="button" data-h="24" data-m="0" data-s="0"
+                class="ttl-chip rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-white/10">24 сағ</button>
+              <button type="button" data-h="168" data-m="0" data-s="0"
+                class="ttl-chip rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-white/10">7 күн</button>
+              <button type="button" data-h="0" data-m="0" data-s="0"
+                class="ttl-chip rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-white/10">Тек 1 рет оқу (мерзімсіз)</button>
+            </div>
+            <p id="ttl-hint" class="mt-1.5 text-xs text-slate-500">Мерзімсіз — жазба тек ашылғанша сақталады.</p>
+          </label>
+
+          <label class="block">
+            <span class="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-300">
+              <i data-lucide="key-round" class="h-4 w-4 text-amber-400"></i>Құпия сөз
+              <span class="text-slate-500">(міндетті емес)</span>
+            </span>
+            <input id="note-pw" type="password" placeholder="Алушы мұны енгізуі керек"
+              class="w-full rounded-xl border border-white/10 bg-black/30 p-3 text-sm placeholder:text-slate-500 focus:border-amber-400/60 focus:outline-none" />
+          </label>
+
+          <button id="btn-create"
+            class="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-3.5 text-sm font-semibold text-slate-950 transition hover:brightness-110 active:scale-[.99] disabled:opacity-50">
+            <i data-lucide="flame" class="h-4 w-4"></i>Шифрланған сілтеме жасау
+          </button>
+
+          <p class="flex items-start gap-2 text-xs leading-relaxed text-slate-500">
+            <i data-lucide="lock" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400/70"></i>
+            <span>Мәтін браузеріңізде AES-256-GCM алгоритмімен шифрланады. Серверде тек шифрланған деректер
+            сақталады; кілт URL-дің <code class="font-mono">#</code> бөлігінде болады және серверге ешқашан жіберілмейді.</span>
+          </p>
+        </div>
+
+        <!-- сілтеме дайын -->
+        <div id="create-result" class="hidden animate-fade-in space-y-5">
+          <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300">
+              <i data-lucide="check-circle-2" class="h-5 w-5"></i>
+            </div>
+            <div>
+              <h2 class="font-semibold text-white">Сіздің кұпия сілтемеңіз</h2>
+              <p class="text-xs text-slate-400">Алушыға толық сілтемені (# хэштегімен бірге) жіберіңіз</p>
+            </div>
+          </div>
+
+          <div class="flex gap-2">
+            <code id="link-box"
+              class="flex-1 break-all rounded-xl border border-emerald-400/25 bg-black/40 p-3 font-mono text-xs text-emerald-300"></code>
+            <button id="btn-copy"
+              class="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-medium text-slate-200 transition hover:bg-white/10">
+              <i data-lucide="copy" class="h-4 w-4"></i>Көшіру
+            </button>
+          </div>
+
+          <div class="flex items-start gap-2.5 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3.5 text-xs leading-relaxed text-amber-200">
+            <i data-lucide="triangle-alert" class="mt-0.5 h-4 w-4 shrink-0"></i>
+            <span>Бұл сілтеме ашылған сәтте жазба <b>автоматты оқылып, бірден толығымен жойылады</b> — қайта ашу мүмкін емес.
+            Алушыға осы толық сілтемені жіберіңіз.</span>
+          </div>
+
+          <button id="btn-new"
+            class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10">
+            Жаңа жазба жасау
+          </button>
+        </div>
+      </section>
+
+      <!-- ============ ТАБ 2: ЖАЗБА ОҚУ ============ -->
+      <section id="panel-read" class="hidden">
+
+        <!-- сілтеме енгізу (жазба белсенді болмаса) -->
+        <div id="read-intro" class="hidden animate-fade-in space-y-4">
+          <label class="block">
+            <span class="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-300">
+              <i data-lucide="link" class="h-4 w-4 text-cyan-400"></i>Кұпия сілтеме
+            </span>
+            <div class="flex gap-2">
+              <input id="read-link" type="text" placeholder="http://…/note/…#k=…"
+                class="flex-1 rounded-xl border border-white/10 bg-black/30 p-3 font-mono text-xs text-slate-100 placeholder:text-slate-500 focus:border-cyan-400/60 focus:outline-none" />
+              <button id="btn-read"
+                class="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 text-sm font-semibold text-slate-950 transition hover:brightness-110">
+                <i data-lucide="unlock" class="h-4 w-4"></i>Оқу
+              </button>
+            </div>
+          </label>
+          <p id="read-intro-error"
+            class="hidden rounded-xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm text-rose-300"></p>
+          <p class="text-xs leading-relaxed text-slate-500">
+            Алушыдан алған <b>толық сілтемені</b> (URL-дің <code class="font-mono">#</code> хэштегімен бірге)
+            жапсырыңыз. Немесе сілтемені тікелей браузерде ашыңыз — жазба <b>автоматты оқылды</b>.
+          </p>
+        </div>
+
+        <!-- жазба табылды: автošы/ақпaрd ашу (сілтеме = кіру) -->
+        <div id="note-ui" class="hidden space-y-5">
+          <div class="text-center">
+            <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">
+              <i data-lucide="file-lock" class="h-7 w-7"></i>
+            </div>
+            <h2 class="text-lg font-semibold text-white">Кұпия жазба таптыңыз</h2>
+            <p id="note-ui-sub" class="mt-1 text-sm text-slate-400">Ашылуда…</p>
+          </div>
+
+          <div id="read-pw-wrap" class="hidden">
+            <div class="flex gap-2">
+              <input id="read-pw" type="password" placeholder="Құпия сөзді енгізіңіз"
+                class="flex-1 rounded-xl border border-white/10 bg-black/30 p-3 text-sm placeholder:text-slate-500 focus:border-amber-400/60 focus:outline-none" />
+              <button id="btn-reveal"
+                class="flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 px-4 text-sm font-semibold text-slate-950 transition hover:brightness-110 disabled:opacity-50">
+                <i data-lucide="unlock" class="h-4 w-4"></i>Ашу
+              </button>
+            </div>
+            <p class="mt-2 text-xs leading-relaxed text-slate-500">
+              Бұл жазба құпия сөзбен қорғалған. Сөзді енгізіп «Ашу» басыңыз (немесе Enter) —
+              қатесі келсе де жазба жойылмайды, қайта көруге болады.
+            </p>
+          </div>
+
+          <p id="read-error"
+            class="hidden rounded-xl border border-rose-400/25 bg-rose-400/10 p-3 text-sm text-rose-300"></p>
+        </div>
+
+        <!-- ашылды -->
+        <div id="view-revealed" class="hidden animate-fade-in space-y-5">
+          <div class="flex items-center gap-2.5 rounded-xl border border-rose-400/25 bg-rose-400/10 p-3.5 text-sm text-rose-300">
+            <i data-lucide="flame" class="h-5 w-5 shrink-0"></i>
+            <span>Жазба оқылды және <b>толығымен жойылды</b>. Бұл сілтеме одан әрі жұмыс істемейді.</span>
+          </div>
+          <div id="revealed-text"
+            class="whitespace-pre-wrap break-words rounded-xl border border-white/10 bg-black/30 p-4 text-sm leading-relaxed text-slate-100"></div>
+          <button id="btn-again"
+            class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-200 transition hover:bg-white/10">
+            Жаңа сілтеме оқу
+          </button>
+        </div>
+
+        <!-- табылмады -->
+        <div id="view-gone" class="hidden animate-fade-in space-y-4 text-center">
+          <div class="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl border border-rose-400/30 bg-rose-400/10 text-rose-300">
+            <i data-lucide="file-x-2" class="h-7 w-7"></i>
+          </div>
+          <h2 id="gone-title" class="text-lg font-semibold text-white">Жазба табылмады немесе жойылған</h2>
+          <p id="gone-desc" class="mx-auto max-w-sm text-sm leading-relaxed text-slate-400">
+            Жазба бұрын ашылған, сақтау мерзімі өткен немесе әрқашан жоқ болуы мүмкін.
+            Бір реттік жазбалар оқылған сәтте мәңгілік күйеді.
+          </p>
+          <button id="btn-home"
+            class="mx-auto rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-200 transition hover:bg-white/10">
+            Жаңа сілтеме оқу
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="mt-6 text-center text-xs text-slate-600">
+      <span class="font-mono">burn-notes</span> · AES-256-GCM · PBKDF2-SHA256 (210 000) · серверде тек ciphertext
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

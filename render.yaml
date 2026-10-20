@@ -1,0 +1,12 @@
+# Render Blueprint — «Deploy on Render» батырмасымен бір басымента
+# кез келген уақытта қолжетімді 24/7 нұсқа (https://render.com, free-тариф).
+services:
+  - type: web
+    name: burn-notes
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /
+    autoDeploy: true
