@@ -32,6 +32,23 @@ if (!window.isSecureContext || !crypto?.subtle) {
   document.body.prepend(w);
 }
 
+/* ---------- Режим: 'server' (Express + in-memory store)
+   немесе 'url' (серверсіз — деректер тікелей шифрленген сілтемеде,
+   мысалы GitHub Pages). Автоматты анықталады. ---------- */
+const MODE = (async () => {
+  if (new URLSearchParams(location.search).get('static') === '1') return 'url'; // локалды тест
+  try {
+    const r = await fetch('/api/health', { cache: 'no-store' });
+    return r.ok ? 'server' : 'url';
+  } catch { return 'url'; }
+})();
+MODE.then((m) => {
+  if (m === 'url') {
+    const h = document.getElementById('files-hint');
+    if (h) h.textContent = 'Ең көбі 5 файл, әрқайсысы 250 КБ (шифрленген деректер сілтемеде жүреді)';
+  }
+});
+
 /* ---------- Шрифт: қазақ әріптерінің (cyrillic-ext) subset-ін
    алдын ала жүктеу — тақырып аралас шрифтпен көрінбесін ---------- */
 const KAZ_FONT_CHARS = 'БАРДЖЗЙКЛМНӨПСТУХҲФЦЧШЫЭЮЯәғқңөұүһіБІРТЕТКЖАЗС0123456789';
@@ -125,7 +142,7 @@ async function keyFromFragment(frag, password) {
 }
 const parseFragment = () => {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
-  return { k: p.get('k'), s: p.get('s'), pw: p.get('pw') };
+  return { k: p.get('k'), s: p.get('s'), pw: p.get('pw'), d: p.get('d') };
 };
 
 /* ============================================================
@@ -162,9 +179,16 @@ const readTtl = () =>
    Math.max(0, parseInt($('#ttl-s').value, 10) || 0));
 function updateTtlHint() {
   const t = readTtl();
-  $('#ttl-hint').textContent = t === 0
-    ? 'Мерзімсіз — жазба тек ашылғанша сақталады.'
-    : `Барлығы: ${t} секунд — мерзімі өтсе автоматты жойылады, ашылған сәтте бірден күйеді.`;
+  MODE.then((m) => {
+    $('#ttl-hint').textContent =
+      m === 'url'
+        ? (t === 0
+            ? 'Мерзімсіз — сілтеме ешқашан өтпейді (ұмытпаңыз!).'
+            : `Барлығы: ${t} секунд — мерзімі өткенде сілтеме ашылмайды. Деректер серверде емес, тікелей сілтемеде.`)
+        : (t === 0
+            ? 'Мерзімсіз — жазба тек ашылғанша сақталады.'
+            : `Барлығы: ${t} секунд — мерзімі өтсе автоматты жойылады, ашылған сәтте бірден күйеді.`);
+  });
 }
 ['ttl-h', 'ttl-m', 'ttl-s'].forEach((id) =>
   $('#' + id).addEventListener('input', updateTtlHint)
@@ -180,7 +204,8 @@ document.querySelectorAll('.ttl-chip').forEach((btn) =>
 
 /* ---------- Файлдар: сурет / аудио / видео / кез келген файл ---------- */
 const MAX_FILES = 5;
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 МБ
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 МБ (серверлік режим)
+const MAX_FILE_SIZE_URL = 250 * 1024;   // 250 КБ (серверсіз режим: деректер сілтемеде жүреді)
 let pendingFiles = []; // { name, type, size, buf: Uint8Array }
 const fmtSize = (b) =>
   b >= 1048576 ? (b / 1048576).toFixed(1) + ' МБ'
@@ -222,7 +247,8 @@ $('#btn-add-files').addEventListener('click', () => $('#note-files').click());
 async function addFiles(fileList) {
   for (const f of fileList) {
     if (pendingFiles.length >= MAX_FILES) { alert('Ең көбі ' + MAX_FILES + ' файл қосуға болады.'); break; }
-    if (f.size > MAX_FILE_SIZE) { alert('«' + f.name + '» 10 МБ-дан үлкен — қосылмады.'); continue; }
+    const limit = (await MODE) === 'url' ? MAX_FILE_SIZE_URL : MAX_FILE_SIZE;
+    if (f.size > limit) { alert('«' + f.name + '» тым үлкен: ең көбі ' + fmtSize(limit) + ' — қосылмады.'); continue; }
     pendingFiles.push({
       name: f.name,
       type: f.type || 'application/octet-stream',
@@ -265,45 +291,66 @@ $('#btn-create').addEventListener('click', async () => {
   if (ttl > TTL_MAX) return alert('Максимум сақтау мерзімі — 7 күн.');
   btn.disabled = true;
   try {
+    const mode = await MODE;
     const key = await makeAesKey();
     // Ашық «конверт»: мәтін + файлдар (base64). Бүкіл конверт
-    // бір AES-256-GCM кілтімен шифрланады — серверге тек ciphertext кетеді.
+    // бір AES-256-GCM кілтімен шифрланады.
+    // v:2 — серверсіз режим: ts/exp конверт ішінде, мерзім оқушының
+    // браузерінде тексеріледі; v:1 — серверлік режим (ескі жазбалар).
     const envelope = JSON.stringify({
-      v: 1,
+      v: mode === 'url' ? 2 : 1,
+      ts: Date.now(),
+      exp: mode === 'url' && ttl > 0 ? Date.now() + ttl * 1000 : null,
       t: text || null,
       f: pendingFiles.map((f) => ({ n: f.name, m: f.type, d: toB64u(f.buf) })),
     });
-    const payload = await aesEncrypt(key, te.encode(envelope)); // серверге тек бұл кетеді
+    const payload = await aesEncrypt(key, te.encode(envelope));
     const frag = password
       ? await wrapKeyWithPassword(key, password)
       : { k: toB64u(new Uint8Array(await crypto.subtle.exportKey('raw', key))) };
 
-    const resp = await fetch('/api/notes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: payload, ttl }),
-    });
-    if (!resp.ok) throw new Error('сервер қатесі: ' + resp.status);
-    const { id } = await resp.json();
-
-    $('#link-box').textContent =
-      location.origin + '/note/' + id + '#' + new URLSearchParams(frag).toString();
-    const fullUrl = $('#link-box').textContent;
-    // QR-код: алушы телефонмен сканерлеп аша алады (кілт сілтемеде — E2EE сақталады)
-    try {
-      await QRCode.toCanvas($('#qr-canvas'), fullUrl, {
-        width: 160, margin: 1,
-        color: { dark: '#0c0a14', light: '#ffffff' },
+    let id, fullUrl;
+    if (mode === 'server') {
+      const resp = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: payload, ttl }),
       });
-    } catch { /* QR-кітапхана жүктелмесе — опциялдық */ }
+      if (!resp.ok) throw new Error('сервер қатесі: ' + resp.status);
+      ({ id } = await resp.json());
+      fullUrl = location.origin + '/note/' + id + '#' + new URLSearchParams(frag).toString();
+    } else {
+      // Серверсіз: кілт + деректер — екеуі де шифрлы түрде тікелей сілтемеде
+      const p = new URLSearchParams();
+      p.set('k', frag.k);
+      if (frag.s) p.set('s', frag.s);
+      if (frag.pw) p.set('pw', frag.pw);
+      p.set('d', payload);
+      id = (window.crypto.randomUUID ? crypto.randomUUID() : 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2));
+      fullUrl = location.href.split('#')[0].split('?')[0] + '#' + p.toString();
+    }
+    $('#link-box').textContent = fullUrl;
+    // QR-код: тек қысқа сілтемеге (QR сыйымдылығы ~2.9 КБ)
+    if (fullUrl.length <= 2200) {
+      try {
+        await QRCode.toCanvas($('#qr-canvas'), fullUrl, {
+          width: 160, margin: 1,
+          color: { dark: '#0c0a14', light: '#ffffff' },
+        });
+        document.getElementById('qr-box').classList.remove('hidden');
+      } catch { /* QR-кітапхана жүктелмесе — опциялдық */ }
+    } else {
+      document.getElementById('qr-box').classList.add('hidden');
+    }
     // Бөлісу сілтемелері
     $('#share-wa').href = 'https://wa.me/?text=' + encodeURIComponent(fullUrl);
     $('#share-tg').href = 'https://t.me/share/url?url=' + encodeURIComponent(fullUrl) +
       '&text=' + encodeURIComponent('Бір реттік кұпия жазба — оқылған сәтте күйеді!');
     if (navigator.share) $('#btn-native-share').classList.remove('hidden');
     // «Менің жазбаларым» (жергілікті тізім)
-    saveMyNote({ id, url: fullUrl, ttl, createdAt: Date.now() });
+    saveMyNote({ id, url: fullUrl, ttl, createdAt: Date.now(), exp: ttl > 0 ? Date.now() + ttl * 1000 : null, mode });
     renderMyNotes();
+    $('#url-mode-note').classList.toggle('hidden', mode !== 'url');
     const fnote = $('#created-files-note');
     if (pendingFiles.length) {
       fnote.textContent = 'Қосылған файлдар: ' + pendingFiles.map((f) => f.name).join(', ') +
@@ -345,6 +392,8 @@ $('#btn-new').addEventListener('click', () => {
   pendingFiles = [];
   renderFileList();
   $('#created-files-note').classList.add('hidden');
+  $('#url-mode-note').classList.add('hidden');
+  document.getElementById('qr-box').classList.remove('hidden');
   $('#create-result').classList.add('hidden');
   $('#create-form').classList.remove('hidden');
 });
@@ -376,9 +425,10 @@ function showGoneView(title, desc) {
   if (desc) $('#gone-desc').textContent = desc;
 }
 function resetReadTab() {
+  revealFrag = null;
   $('#read-link').value = '';
   $('#read-pw').value = '';
-  history.replaceState(null, '', location.pathname === '/' ? '/' : '/');
+  history.replaceState(null, '', location.pathname + location.search); // hash-тен деректерді аластаймыз
   switchTab('read');
   showReadIntro();
 }
@@ -401,8 +451,24 @@ $('#btn-read').addEventListener('click', () => {
   } catch {
     return fail('Бұл сілтеме сияқты емес.');
   }
+  const pp = new URLSearchParams(u.hash.replace(/^#/, ''));
+  if (pp.get('d')) {
+    // Серверсіз сілтеме: деректер хэштегте — бетті ауыртпай, тікелей оқимыз
+    if (!pp.get('k')) return fail('Сілтемеде кілт жоқ — толық сілтемені көшіріп алыңыз.');
+    revealFrag = { k: pp.get('k'), s: pp.get('s'), pw: pp.get('pw'), d: pp.get('d') };
+    switchTab('read');
+    showNoteUi();
+    if (pp.get('pw') === '1') {
+      $('#read-pw-wrap').classList.remove('hidden');
+      $('#note-ui-sub').textContent = 'Бұл жазба құпия сөзбен қорғалған';
+      $('#read-pw').focus();
+    } else {
+      doReveal();
+    }
+    return;
+  }
   if (!/^\/note\/[a-f0-9]{32}$/.test(u.pathname)) {
-    return fail('Сілтеме дұрыс емес: /note/<id> формасы керек.');
+    return fail('Сілтеме дұрыс емес: /note/<id> формасы немесе #d=... хэштегі керек.');
   }
   if (!u.hash) {
     return fail('Сілтемеде кілт жоқ — # хэштегімен бірге көшіріп алыңыз.');
@@ -435,7 +501,7 @@ function showRevealedContent(plain) {
   let env = null;
   try {
     const j = JSON.parse(plain);
-    if (j && typeof j === 'object' && j.v === 1) env = j;
+    if (j && typeof j === 'object' && (j.v === 1 || j.v === 2)) env = j;
   } catch { /* жай мәтін */ }
 
   const text = env ? (env.t || '') : plain;
@@ -478,19 +544,58 @@ function showRevealedContent(plain) {
 }
 
 /* «Ашу» — бір функция: қолмен басу (құпия сөзбен) немесе сілтеме
-   ашылғанда автоматты (құпия сөзсіз). Сілтемені ашу = кіру. */
+   ашылғанда автоматты (құпия сөзсіз). Сілтемені ашу = кіру.
+   Екі режим: серверлік (d жоқ, деректер серверде) және серверсіз
+   (d бар — деректер тікелей сілтемеде). */
+let revealFrag = null; // «Сілтемемен ашу» арқылы жапсырылған URL-дің фрагменті
 async function doReveal() {
   readErrorHide();
-  if (!noteMatch || !frag.k) {
-    return showGoneView('Сілтеме толық емес', 'Кілт (URL-дің # бөлігі) жоқ болғандықтан жазбаны ашу мүмкін емес.');
-  }
+  const f = revealFrag || frag;
   const btn = $('#btn-reveal');
   if (btn) btn.disabled = true;
+
+  if (f.d) {
+    /* ---------- Серверсіз режим: деректер тікелей сілтемеде ---------- */
+    $('#note-ui-sub').textContent = 'Ашылуда… жазба шифрлі түрде сілтемеде сақталған';
+    try {
+      let key;
+      try {
+        key = await keyFromFragment(f, $('#read-pw').value);
+      } catch {
+        readErrorShow('Құпия сөз қате. Жазба әлі ашық — қайталап көріңіз.');
+        return;
+      }
+      const plain = await aesDecrypt(key, f.d);
+      history.replaceState(null, '', location.pathname + location.search); // деректер URL-ден аластайды
+      let env = null;
+      try { const j = JSON.parse(plain); if (j && typeof j === 'object' && (j.v === 1 || j.v === 2)) env = j; } catch { /* жай мәтін */ }
+      if (env && env.exp && Date.now() > env.exp) {
+        return showGoneView('Жазбаның мерзімі өтті', 'Бұл жазбаның мерзімі өтті — ол күйіп, енді ашылмайды.');
+      }
+      showRevealedContent(plain);
+      document.getElementById('revealed-burn-msg').innerHTML =
+        'Жазба ашылды. Ол серверде сақталмады — деректер сілтеменің өзінде еді. <b>Сілтемені өшіріп тастаңыз.</b>';
+      $('#read-intro').classList.add('hidden');
+      $('#note-ui').classList.add('hidden');
+      $('#view-gone').classList.add('hidden');
+      $('#view-revealed').classList.remove('hidden');
+    } catch (e) {
+      showGoneView('Жазбаны оқу мүмкін болмады', e.message);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+    return;
+  }
+
+  /* ---------- Серверлік режим: деректер серверде, атомдық оқу + өшіру ---------- */
+  if (!noteMatch || !f.k) {
+    return showGoneView('Сілтеме толық емес', 'Кілт (URL-дің # бөлігі) жоқ болғандықтан жазбаны ашу мүмкін емес.');
+  }
   $('#note-ui-sub').textContent = 'Ашылуда… жазба бір реттік толығымен жойылады';
   try {
     let key;
     try {
-      key = await keyFromFragment(frag, $('#read-pw').value);
+      key = await keyFromFragment(f, $('#read-pw').value);
     } catch {
       // Қате құпия сөз: серверден сұрау ЖАСАМАЙМЫЗ, яғни жазба әлі жойылмайды
       readErrorShow('Құпия сөз қате. Жазба әлі жойылмады — қайталап көріңіз.');
@@ -503,6 +608,8 @@ async function doReveal() {
     const plain = await aesDecrypt(key, data);
     history.replaceState(null, '', location.pathname); // кілт енді қажет емес — URL-ден аластаймыз
     showRevealedContent(plain);
+    document.getElementById('revealed-burn-msg').innerHTML =
+      'Жазба оқылды және <b>толығымен жойылды</b>. Бұл сілтеме одан әрі жұмыс істемейді.';
     $('#read-intro').classList.add('hidden');
     $('#note-ui').classList.add('hidden');
     $('#view-gone').classList.add('hidden');
@@ -545,17 +652,24 @@ const ttlLabel = (ttl) =>
   : Math.round(ttl / 86_400) + ' күн';
 
 async function checkNoteStatus(item, el) {
-  try {
-    const resp = await fetch('/api/notes/' + item.id + '/status');
-    item.status = resp.ok ? 'alive' : 'gone';
-  } catch { item.status = 'unknown'; }
+  const m = item.mode || await MODE; // ескі жазбаларда mode белгісі жоқ болуы мүмкін
+  if (m === 'url') {
+    item.status = item.exp && Date.now() > item.exp ? 'gone' : 'alive';
+  } else {
+    try {
+      const resp = await fetch('/api/notes/' + item.id + '/status');
+      item.status = resp.ok ? 'alive' : 'gone';
+    } catch { item.status = 'unknown'; }
+  }
   const dot = el.querySelector('.status-dot');
   const label = el.querySelector('.status-label');
   if (!dot || !label) return;
   dot.className = 'status-dot h-2 w-2 shrink-0 rounded-full ' +
     (item.status === 'alive' ? 'bg-emerald-400' : item.status === 'gone' ? 'bg-rose-400' : 'bg-slate-500');
   label.classList.toggle('line-through', item.status === 'gone');
-  label.title = item.status === 'alive' ? 'әлі оқылмады' : item.status === 'gone' ? 'оқылды немесе мерзімі өтті' : 'тексерілуде';
+  label.title = m === 'url'
+    ? (item.status === 'alive' ? 'мерзімі өткенше ашылады' : 'мерзімі өтті')
+    : (item.status === 'alive' ? 'әлі оқылмады' : item.status === 'gone' ? 'оқылды немесе мерзімі өтті' : 'тексерілуде');
 }
 function renderMyNotes() {
   const wrap = $('#my-notes');
@@ -575,7 +689,7 @@ function renderMyNotes() {
       '<button data-act="del" title="Тізімнен өшіру" class="shrink-0 text-slate-500 transition hover:text-rose-400"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>';
     const label = li.querySelector('.status-label');
     label.textContent = item.url.replace(location.origin, '');
-    label.title = item.status === 'gone' ? 'оқылды немесе мерзімі өтті' : 'әлі оқылмады';
+    label.title = '';
     li.querySelector('[data-act="copy"]').addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(item.url); } catch { /* */ }
     });
@@ -628,9 +742,21 @@ $('#btn-download-text').addEventListener('click', () => {
 /* ---------- Роутер: сілтеме ашылса — «Жазба оқу» табын ашып,
    құпия сөзсіз жазбаны АВТОМАТТЫ оқиды (сілтеме = кіру) ---------- */
 (function route() {
+  const isUrlNote = !!frag.d;
   // Сілтеме ашылса (алымышы үшін) — тақырыпты жасырып, тікелей оқуға өтеміз
-  if (noteMatch) document.getElementById('hero').classList.add('hidden');
-  if (noteMatch && frag.k) {
+  if (noteMatch || isUrlNote) document.getElementById('hero').classList.add('hidden');
+  if (isUrlNote) {
+    switchTab('read');
+    showNoteUi();
+    if (frag.pw === '1') {
+      $('#read-pw-wrap').classList.remove('hidden');
+      $('#note-ui-sub').textContent = 'Бұл жазба құпия сөзбен қорғалған';
+      $('#read-pw').focus();
+    } else {
+      doReveal();
+    }
+    renderMyNotes();
+  } else if (noteMatch && frag.k) {
     switchTab('read');
     showNoteUi();
     if (frag.pw === '1') {
