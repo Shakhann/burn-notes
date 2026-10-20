@@ -85,6 +85,26 @@ function fromB64u(s) {
   return out;
 }
 
+/* ---------- Бір реттік (серверсіз режим): құрылғы деңгейіндегі «жоғалту» ----------
+   Сілтеме ашылған құрылғыда/браузерде бір рет ғана оқылады: ciphertext-тің
+   SHA-256 «саусақ ізі» localStorage-қа жазылады, қайта ашу — «жоқталған». */
+const READ_FP_KEY = 'burnNotes.readFp';
+const getReadFps = () => {
+  try { return JSON.parse(localStorage.getItem(READ_FP_KEY)) || []; } catch { return []; }
+};
+const isNoteRead = (fp) => getReadFps().includes(fp);
+const markNoteRead = (fp) => {
+  const list = getReadFps();
+  if (!list.includes(fp)) {
+    list.unshift(fp);
+    try { localStorage.setItem(READ_FP_KEY, JSON.stringify(list.slice(0, 300))); } catch { /* квота */ }
+  }
+};
+const sha256Hex = async (s) => {
+  const buf = await crypto.subtle.digest('SHA-256', te.encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+};
+
 /* ---------- AES-256-GCM (Web Crypto API) ---------- */
 function makeAesKey() {
   return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
@@ -183,7 +203,7 @@ function updateTtlHint() {
     $('#ttl-hint').textContent =
       m === 'url'
         ? (t === 0
-            ? 'Мерзімсіз — сілтеме ешқашан өтпейді (ұмытпаңыз!).'
+            ? 'Мерзімсіз — уақыт бойынша өтпейді, бірақ әр құрылғыда бір рет ғана ашылады.'
             : `Барлығы: ${t} секунд — мерзімі өткенде сілтеме ашылмайды. Деректер серверде емес, тікелей сілтемеде.`)
         : (t === 0
             ? 'Мерзімсіз — жазба тек ашылғанша сақталады.'
@@ -558,6 +578,12 @@ async function doReveal() {
     /* ---------- Серверсіз режим: деректер тікелей сілтемеде ---------- */
     $('#note-ui-sub').textContent = 'Ашылуда… жазба шифрлі түрде сілтемеде сақталған';
     try {
+      // Бір реттік: бұл құрылғыда бұрын оқылған ма? (дешифрлауға араласпай тексереміз)
+      const fp = await sha256Hex(f.d);
+      if (isNoteRead(fp)) {
+        history.replaceState(null, '', location.pathname + location.search);
+        return showGoneView('Жазба оқылды', 'Бұл жазба осы құрылғыда бұрын оқылған — ол күйіп, қайта ашылмайды.');
+      }
       let key;
       try {
         key = await keyFromFragment(f, $('#read-pw').value);
@@ -570,11 +596,13 @@ async function doReveal() {
       let env = null;
       try { const j = JSON.parse(plain); if (j && typeof j === 'object' && (j.v === 1 || j.v === 2)) env = j; } catch { /* жай мәтін */ }
       if (env && env.exp && Date.now() > env.exp) {
+        markNoteRead(fp);
         return showGoneView('Жазбаның мерзімі өтті', 'Бұл жазбаның мерзімі өтті — ол күйіп, енді ашылмайды.');
       }
       showRevealedContent(plain);
+      markNoteRead(fp); // бір реттік белгі: енді бұл құрылғыда ашылмайды
       document.getElementById('revealed-burn-msg').innerHTML =
-        'Жазба ашылды. Ол серверде сақталмады — деректер сілтеменің өзінде еді. <b>Сілтемені өшіріп тастаңыз.</b>';
+        'Жазба оқылды және бұл құрылғыда <b>толығымен жойылды</b> — бұл сілтеме қайта ашылмайды.';
       $('#read-intro').classList.add('hidden');
       $('#note-ui').classList.add('hidden');
       $('#view-gone').classList.add('hidden');

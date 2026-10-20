@@ -295,7 +295,9 @@
         <p id="created-files-note" class="hidden text-xs leading-relaxed text-slate-400"></p>
 
         <div id="url-mode-note" class="hidden rounded-2xl border border-sky-400/25 bg-sky-400/10 p-3.5 text-xs leading-relaxed text-sky-200">
-          🔒 <b>Серверсіз режим:</b> жазба ешқандай серверде сақталмады — ол шифрленіп, тікелей сілтеме ішіне жасырылды. Мерзімі өткенде сілтеме ашылмайды. Сілтемені тек сенімді адамға жіберіңіз: «қашырдан өшіру» мүмкін емес.
+          🔒 <b>Серверсіз режим:</b> жазба ешқандай серверде сақталмады — ол шифрленіп, тікелей сілтеме ішіне жасырылды.<br>
+          🔥 <b>Бір реттік:</b> сілтеме ашылған құрылғыда (браузерде) бір рет ғана оқылады — қайталап ашса, «жоқталған» деп көрсетіледі.<br>
+          ⏱ Мерзімі өткенде сілтеме ешқандай құрылғыда ашылмайды.
         </div>
 
         <!-- QR-код + бөлісу -->
@@ -444,6 +446,11 @@
     </footer>
   </div>
 
+  <script>
+    /* Базис жолы: Express /note/<id> бетінде '/' ; GitHub Pages-те /burn-notes/.
+       app.js relative жүктелуі екі де жерде дұрыс болуы үшін. */
+    document.write('<base href="' + (location.pathname.indexOf('/note/') === 0 ? '/' : location.pathname.replace(/[^/]+$/, '')) + '"/>');
+  </script>
   <script src="app.js"></script>
   <script>lucide.createIcons();</script>
 </body>
