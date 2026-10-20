@@ -193,8 +193,8 @@ function renderFileList() {
 }
 
 $('#btn-add-files').addEventListener('click', () => $('#note-files').click());
-$('#note-files').addEventListener('change', async (e) => {
-  for (const f of e.target.files) {
+async function addFiles(fileList) {
+  for (const f of fileList) {
     if (pendingFiles.length >= MAX_FILES) { alert('Ең көбі ' + MAX_FILES + ' файл қосуға болады.'); break; }
     if (f.size > MAX_FILE_SIZE) { alert('«' + f.name + '» 10 МБ-дан үлкен — қосылмады.'); continue; }
     pendingFiles.push({
@@ -204,8 +204,30 @@ $('#note-files').addEventListener('change', async (e) => {
       buf: new Uint8Array(await f.arrayBuffer()),
     });
   }
-  e.target.value = '';
   renderFileList();
+}
+$('#note-files').addEventListener('change', (e) => {
+  addFiles(e.target.files);
+  e.target.value = '';
+});
+
+/* ---------- Drag & drop: файлдарды аймаққа тастау ---------- */
+const dropZone = $('#btn-add-files');
+['dragenter', 'dragover'].forEach((ev) =>
+  dropZone.addEventListener(ev, (e) => {
+    e.preventDefault();
+    dropZone.classList.add('border-fuchsia-400/70', 'bg-fuchsia-400/10');
+  })
+);
+['dragleave', 'drop'].forEach((ev) =>
+  dropZone.addEventListener(ev, (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('border-fuchsia-400/70', 'bg-fuchsia-400/10');
+  })
+);
+dropZone.addEventListener('drop', (e) => {
+  const files = Array.from(e.dataTransfer.files || []);
+  if (files.length) addFiles(files);
 });
 
 $('#btn-create').addEventListener('click', async () => {
@@ -240,6 +262,22 @@ $('#btn-create').addEventListener('click', async () => {
 
     $('#link-box').textContent =
       location.origin + '/note/' + id + '#' + new URLSearchParams(frag).toString();
+    const fullUrl = $('#link-box').textContent;
+    // QR-код: алушы телефонмен сканерлеп аша алады (кілт сілтемеде — E2EE сақталады)
+    try {
+      await QRCode.toCanvas($('#qr-canvas'), fullUrl, {
+        width: 160, margin: 1,
+        color: { dark: '#0c0a14', light: '#ffffff' },
+      });
+    } catch { /* QR-кітапхана жүктелмесе — опциялдық */ }
+    // Бөлісу сілтемелері
+    $('#share-wa').href = 'https://wa.me/?text=' + encodeURIComponent(fullUrl);
+    $('#share-tg').href = 'https://t.me/share/url?url=' + encodeURIComponent(fullUrl) +
+      '&text=' + encodeURIComponent('Бір реттік кұпия жазба — оқылған сәтте күйеді!');
+    if (navigator.share) $('#btn-native-share').classList.remove('hidden');
+    // «Менің жазбаларым» (жергілікті тізім)
+    saveMyNote({ id, url: fullUrl, ttl, createdAt: Date.now() });
+    renderMyNotes();
     const fnote = $('#created-files-note');
     if (pendingFiles.length) {
       fnote.textContent = 'Қосылған файлдар: ' + pendingFiles.map((f) => f.name).join(', ') +
@@ -381,6 +419,7 @@ function showRevealedContent(plain) {
   } else {
     textWrap.classList.add('hidden');
   }
+  $('#revealed-actions').classList.toggle('hidden', !text);
 
   for (const f of (env && Array.isArray(env.f) ? env.f : [])) {
     const bytes = fromB64u(f.d);
@@ -453,6 +492,113 @@ $('#read-pw').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') doReveal();
 });
 
+/* ---------- «Менің жазбаларым»: жіберілген сілтемелердің жергілікті тізімі ---------- */
+const MY_NOTES_KEY = 'burnNotes.myLinks';
+const loadMyNotes = () => {
+  try { return JSON.parse(localStorage.getItem(MY_NOTES_KEY)) || []; } catch { return []; }
+};
+const saveMyNotes = (list) => {
+  try { localStorage.setItem(MY_NOTES_KEY, JSON.stringify(list.slice(0, 50))); } catch { /* квота */ }
+};
+function saveMyNote(note) {
+  const list = loadMyNotes().filter((n) => n.id !== note.id);
+  list.unshift(note);
+  saveMyNotes(list);
+}
+const fmtAgo = (ts) => {
+  const d = Date.now() - ts;
+  if (d < 60_000) return 'жаңа';
+  if (d < 3_600_000) return Math.floor(d / 60_000) + ' мин бұрын';
+  if (d < 86_400_000) return Math.floor(d / 3_600_000) + ' сағ бұрын';
+  return Math.floor(d / 86_400_000) + ' күн бұрын';
+};
+const ttlLabel = (ttl) =>
+  ttl === 0 ? 'мерзімсіз'
+  : ttl < 3600 ? Math.ceil(ttl / 60) + ' мин'
+  : ttl < 86_400 ? (ttl / 3600).toFixed(ttl % 3600 ? 1 : 0) + ' сағ'
+  : Math.round(ttl / 86_400) + ' күн';
+
+async function checkNoteStatus(item, el) {
+  try {
+    const resp = await fetch('/api/notes/' + item.id + '/status');
+    item.status = resp.ok ? 'alive' : 'gone';
+  } catch { item.status = 'unknown'; }
+  const dot = el.querySelector('.status-dot');
+  const label = el.querySelector('.status-label');
+  if (!dot || !label) return;
+  dot.className = 'status-dot h-2 w-2 shrink-0 rounded-full ' +
+    (item.status === 'alive' ? 'bg-emerald-400' : item.status === 'gone' ? 'bg-rose-400' : 'bg-slate-500');
+  label.classList.toggle('line-through', item.status === 'gone');
+  label.title = item.status === 'alive' ? 'әлі оқылмады' : item.status === 'gone' ? 'оқылды немесе мерзімі өтті' : 'тексерілуде';
+}
+function renderMyNotes() {
+  const wrap = $('#my-notes');
+  const ul = $('#my-notes-list');
+  const list = loadMyNotes();
+  wrap.classList.toggle('hidden', list.length === 0);
+  ul.innerHTML = '';
+  list.forEach((item) => {
+    const li = document.createElement('li');
+    li.className = 'flex items-center gap-2.5 rounded-2xl border border-white/10 bg-white/[.03] px-3 py-2.5';
+    li.innerHTML =
+      '<span class="status-dot h-2 w-2 shrink-0 rounded-full bg-slate-500"></span>' +
+      '<span class="status-label min-w-0 flex-1 truncate text-xs text-slate-300" title=""></span>' +
+      '<span class="shrink-0 text-[10px] text-slate-600">' + fmtAgo(item.createdAt) + ' · ' + ttlLabel(item.ttl || 0) + '</span>' +
+      '<button data-act="copy" title="Көшіру" class="shrink-0 text-slate-500 transition hover:text-fuchsia-300"><i data-lucide="copy" class="h-3.5 w-3.5"></i></button>' +
+      '<button data-act="check" title="Тексеру" class="shrink-0 text-slate-500 transition hover:text-fuchsia-300"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i></button>' +
+      '<button data-act="del" title="Тізімнен өшіру" class="shrink-0 text-slate-500 transition hover:text-rose-400"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button>';
+    const label = li.querySelector('.status-label');
+    label.textContent = item.url.replace(location.origin, '');
+    label.title = item.status === 'gone' ? 'оқылды немесе мерзімі өтті' : 'әлі оқылмады';
+    li.querySelector('[data-act="copy"]').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(item.url); } catch { /* */ }
+    });
+    li.querySelector('[data-act="check"]').addEventListener('click', () => checkNoteStatus(item, li));
+    li.querySelector('[data-act="del"]').addEventListener('click', () => {
+      saveMyNotes(loadMyNotes().filter((n) => n.id !== item.id));
+      renderMyNotes();
+    });
+    ul.appendChild(li);
+  });
+  if (ul.children.length) lucide.createIcons();
+  // белсенді жазбалардың жағдайын автоматты жаңарту
+  Array.from(ul.children).forEach((li, i) => {
+    const item = list[i];
+    if (item && item.status !== 'gone') checkNoteStatus(item, li);
+  });
+}
+renderMyNotes();
+setInterval(() => {
+  if (document.hidden) return;
+  const list = loadMyNotes();
+  const ul = $('#my-notes-list');
+  Array.from(ul.children).forEach((li, i) => {
+    const item = list[i];
+    if (item && item.status !== 'gone') checkNoteStatus(item, li);
+  });
+}, 12_000);
+$('#btn-clear-notes').addEventListener('click', () => {
+  saveMyNotes([]);
+  renderMyNotes();
+});
+
+/* ---------- Ашылған жазба: мәтінді көшіру / жүктеу ---------- */
+$('#btn-copy-text').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('#revealed-text').textContent); } catch { /* */ }
+  const b = $('#btn-copy-text');
+  const old = b.innerHTML;
+  b.textContent = '✓ Көшірілді';
+  setTimeout(() => { b.innerHTML = old; lucide.createIcons(); }, 1400);
+});
+$('#btn-download-text').addEventListener('click', () => {
+  const blob = new Blob([$('#revealed-text').textContent], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'burn-note.txt';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+});
+
 /* ---------- Роутер: сілтеме ашылса — «Жазба оқу» табын ашып,
    құпия сөзсіз жазбаны АВТОМАТТЫ оқиды (сілтеме = кіру) ---------- */
 (function route() {
@@ -467,6 +613,7 @@ $('#read-pw').addEventListener('keydown', (e) => {
     } else {
       doReveal(); // құпия сөзсіз: ашылған сәтте бірден оқу + жойылу
     }
+    renderMyNotes(); // ашылса — тізімдегі жағдай да жаңарып қалады
   } else if (noteMatch) {
     // /note/<id> ашылды, бірақ кілт жоқ
     switchTab('read');

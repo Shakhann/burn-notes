@@ -39,6 +39,17 @@ class NoteStore {
     return note.data;
   }
 
+  /** Жазба әлі бар ма? (оқу емес — жоймайды). Жіберуші «ашылды ма?» дегенді білу үшін. */
+  exists(id) {
+    const note = this.map.get(id);
+    if (!note) return false;
+    if (note.expiresAt !== null && note.expiresAt <= Date.now()) {
+      this.map.delete(id);
+      return false;
+    }
+    return true;
+  }
+
   size() {
     this._sweep();
     return this.map.size;

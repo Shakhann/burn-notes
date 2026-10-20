@@ -60,6 +60,16 @@ app.post('/api/notes', (req, res) => {
   res.status(201).json({ id });
 });
 
+/** Жазбаның қалып-жағдайы (ОҚУ ЕМЕС — жазба жойылмайды).
+ *  Тек id білетін адамға ғана пайдалы (id = 128 бит кездейсоқ сан).
+ *  «Менің жазбаларым» тізімінде «ашылды ма?» көрсету үшін. */
+app.get('/api/notes/:id/status', (req, res) => {
+  const { id } = req.params;
+  if (!/^[a-f0-9]{32}$/.test(id)) return res.status(400).json({ error: 'bad_id' });
+  if (store.exists(id)) return res.json({ status: 'alive' });
+  return res.status(404).json({ error: 'not_found' });
+});
+
 /** Атомдық оқу: GET + DELETE бір уақытта (Redis баламасы — GETDEL).
  *  Екінші сұрау — 404 «Жазба табылмады немесе жойылған». */
 app.get('/api/notes/:id', (req, res) => {
