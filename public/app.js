@@ -113,15 +113,11 @@ const parseFragment = () => {
 /* ============================================================
  * ТАПТАР
  * ============================================================ */
-const TAB_ON =
-  'flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 px-3 py-2.5 text-sm font-semibold text-slate-950';
-const TAB_OFF =
-  'flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-400 transition hover:text-slate-200';
-
+/* Дизайн CSS-те: .tab-btn / .is-active (index.html) */
 function switchTab(name) {
   const isCreate = name === 'create';
-  $('#tab-create').className = isCreate ? TAB_ON : TAB_OFF;
-  $('#tab-read').className = isCreate ? TAB_OFF : TAB_ON;
+  $('#tab-create').classList.toggle('is-active', isCreate);
+  $('#tab-read').classList.toggle('is-active', !isCreate);
   $('#panel-create').classList.toggle('hidden', !isCreate);
   $('#panel-read').classList.toggle('hidden', isCreate);
 }
@@ -170,14 +166,14 @@ function renderFileList() {
   ul.innerHTML = '';
   pendingFiles.forEach((f, i) => {
     const li = document.createElement('li');
-    li.className = 'flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs';
+    li.className = 'flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs';
     const icon = document.createElement('i');
     icon.setAttribute('data-lucide',
       f.type.startsWith('image/') ? 'image'
       : f.type.startsWith('audio/') ? 'music'
       : f.type.startsWith('video/') ? 'video'
       : 'file');
-    icon.className = 'h-4 w-4 shrink-0 text-cyan-400';
+    icon.className = 'h-4 w-4 shrink-0 text-fuchsia-300';
     const name = document.createElement('span');
     name.className = 'min-w-0 flex-1 truncate text-slate-200';
     name.textContent = f.name; // textContent — қауіпсіз
@@ -404,7 +400,7 @@ function showRevealedContent(plain) {
     card.className = 'overflow-hidden rounded-xl border border-white/10 bg-black/30';
     card.innerHTML =
       (mediaHtml ? mediaHtml + '<div class="flex items-center gap-2 border-t border-white/10 p-3">' : '<div class="flex items-center gap-2 p-3">') +
-      '<i data-lucide="' + (isImg ? 'image' : isAudio ? 'music' : isVideo ? 'video' : 'file') + '" class="h-4 w-4 shrink-0 text-cyan-400"></i>' +
+      '<i data-lucide="' + (isImg ? 'image' : isAudio ? 'music' : isVideo ? 'video' : 'file') + '" class="h-4 w-4 shrink-0 text-fuchsia-300"></i>' +
       '<span class="file-name min-w-0 flex-1 truncate text-xs text-slate-300"></span>' +
       '<span class="shrink-0 text-xs text-slate-500">' + fmtSize(bytes.length) + '</span>' +
       '<a href="' + url + '" download="" class="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-slate-200 transition hover:bg-white/10">' +
